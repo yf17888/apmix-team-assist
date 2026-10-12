@@ -6,17 +6,18 @@
   "scripts": {
     "dev": "wxt",
     "dev:edge": "wxt -b edge",
-    "dev:firefox": "wxt -b firefox",
+    "dev:firefox": "wxt -b firefox --mv3",
     "build:chrome": "wxt build",
     "build:edge": "wxt build -b edge",
-    "build:firefox": "wxt build -b firefox",
+    "build:firefox": "wxt build -b firefox --mv3",
     "build:all": "npm run build:chrome && npm run build:edge && npm run build:firefox",
-    "zip:all": "wxt zip && wxt zip -b edge && wxt zip -b firefox",
+    "zip:all": "wxt zip && wxt zip -b edge && wxt zip -b firefox --mv3",
     "compile": "tsc --noEmit",
     "test": "vitest run",
     "postinstall": "wxt prepare"
   },
   "devDependencies": {
+    "happy-dom": "^15.11.7",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0",
     "wxt": "^0.19.0"
