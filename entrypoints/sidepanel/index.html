@@ -1,5 +1,59 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head><meta charset="UTF-8" /><title>APMIX Team Assist</title></head>
-  <body><div id="app">APMIX Team Assist</div><script type="module" src="./main.ts"></script></body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APMIX Team Assist</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header>
+      <strong>APMIX Team Assist</strong>
+      <nav>
+        <button data-tab="roster" class="on">名单</button>
+        <button data-tab="settings">设置</button>
+      </nav>
+    </header>
+    <div id="toast" hidden></div>
+    <main>
+      <section id="tab-roster">
+        <div id="lock"></div>
+        <div id="task"></div>
+        <details id="import">
+          <summary>导入名单</summary>
+          <p class="muted">CSV：姓名,邮箱,部门（每行一人，只接受设置中的公司域名，重复邮箱自动跳过）</p>
+          <textarea id="csv" rows="5" placeholder="张三,zhangsan@yourcorp.com,研发"></textarea>
+          <div class="row">
+            <input type="file" id="csvFile" accept=".csv,.txt" />
+            <button id="doImport" class="primary">导入</button>
+          </div>
+          <div id="importResult" class="muted"></div>
+        </details>
+        <div class="row">
+          <input id="search" placeholder="搜索姓名 / 邮箱 / 部门" />
+          <select id="filter">
+            <option value="">全部状态</option>
+          </select>
+        </div>
+        <div id="list"></div>
+        <div class="row"><button id="exportCsv">导出名单状态（不含 Key）</button></div>
+      </section>
+      <section id="tab-settings" hidden>
+        <label>公司邮箱域名（逗号分隔）<input id="domains" placeholder="yourcorp.com" /></label>
+        <label>Key 命名规则<input id="keyTpl" placeholder="{name}-{dept}" /></label>
+        <p class="muted">可用变量：{name} 姓名、{dept} 部门、{user} 邮箱前缀</p>
+        <label>使用模式
+          <select id="mode">
+            <option value="self">同事自助（Key 只在本人电脑）</option>
+            <option value="admin">管理员代办（逐个处理，交付后删除）</option>
+          </select>
+        </label>
+        <button id="saveSettings" class="primary">保存设置</button>
+        <hr />
+        <div id="adminTools"></div>
+        <p class="muted small">原则：一人一号、人工完成人机验证、一次只处理一人；不读取邮箱，不向第三方发送数据。</p>
+      </section>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
 </html>
