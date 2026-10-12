@@ -20,6 +20,9 @@ export type Msg =
   | { type: 'clearApmixSession' }
   // 内容脚本 → 后台
   | { type: 'cs:getTask' }
+  | { type: 'cs:openPanel' }
+  | { type: 'cs:selfStart'; name: string; email: string }
+  | { type: 'cs:status' }
   | { type: 'cs:linkSent' }
   | { type: 'cs:rejected'; reason: string }
   | { type: 'cs:keyCaptured'; key: string; emailSeen: boolean };
