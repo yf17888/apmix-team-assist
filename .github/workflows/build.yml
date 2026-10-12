@@ -28,3 +28,4 @@ jobs:
           name: apmix-team-assist
           path: .output/*.zip
           if-no-files-found: error
+# ci
