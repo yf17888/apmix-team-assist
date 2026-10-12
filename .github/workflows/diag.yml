@@ -1,0 +1,20 @@
+name: diag
+on:
+  workflow_run:
+    workflows: [build]
+    types: [completed]
+permissions:
+  actions: read
+  issues: write
+  contents: read
+jobs:
+  diag:
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.event.workflow_run.id }}
+        run: |
+          gh run view "$RUN" -R "$GITHUB_REPOSITORY" --log-failed | tail -c 60000 > log.txt || echo "no log" > log.txt
+          gh issue create -R "$GITHUB_REPOSITORY" --title "CI diag $RUN" --body-file log.txt
