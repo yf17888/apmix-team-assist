@@ -90,6 +90,42 @@ async function currentColleague(): Promise<Colleague | null> {
   return (await getRoster()).find((c) => c.email === task.email) ?? null;
 }
 
+async function beginTask(email: string, reuseTabId?: number) {
+  const settings = await getSettings();
+  const err = settingsReady(settings);
+  if (err) throw new Error(err);
+  if (await getTask()) throw new Error('已有进行中的任务，一次只处理一个人');
+  const roster = await getRoster();
+  const c = roster.find((x) => x.email === email);
+  if (!c) throw new Error('名单中没有该邮箱');
+  if (!isAllowed(c.email, settings.allowedDomains)) throw new Error('非公司域名');
+  if (c.status !== 'pending') throw new Error('只有「待开始」的同事可以开始');
+  await updateColleague(c.email, { status: 'filling', keyName: renderKeyName(settings.keyNameTemplate, c), note: '' });
+  let tabId = reuseTabId;
+  if (tabId !== undefined) {
+    await setTask({ email: c.email, tabId, startedAt: new Date().toISOString() });
+    await browser.tabs.update(tabId, { url: LOGIN_URL, active: true });
+  } else {
+    const tab = await browser.tabs.create({ url: LOGIN_URL, active: true });
+    tabId = tab.id;
+    await setTask({ email: c.email, tabId, startedAt: new Date().toISOString() });
+  }
+}
+
+const PANEL_URL = () => browser.runtime.getURL('/sidepanel.html');
+
+/** 打开助手面板。必须在用户手势的同步调用栈里执行（不能先 await）。 */
+function openPanel(tabId?: number, windowId?: number) {
+  const c = (globalThis as any).chrome;
+  if (c?.sidePanel?.open) {
+    const p = tabId !== undefined ? c.sidePanel.open({ tabId }) : c.sidePanel.open({ windowId });
+    return Promise.resolve(p).catch(() => browser.tabs.create({ url: PANEL_URL() }));
+  }
+  const sb = (browser as any).sidebarAction;
+  if (sb?.open) return Promise.resolve(sb.open()).catch(() => browser.tabs.create({ url: PANEL_URL() }));
+  return browser.tabs.create({ url: PANEL_URL() });
+}
+
 async function handle(msg: Msg, sender: { tab?: { id?: number; url?: string } }): Promise<unknown> {
   switch (msg.type) {
     case 'getState':
@@ -145,20 +181,36 @@ async function handle(msg: Msg, sender: { tab?: { id?: number; url?: string } })
       await session.remove('vk');
       return state();
 
-    case 'startTask': {
+    case 'startTask':
+      await beginTask(msg.email);
+      return state();
+
+    case 'cs:selfStart': {
       const settings = await getSettings();
       const err = settingsReady(settings);
-      if (err) throw new Error(err);
+      if (err) throw new Error(`${err}（请先在助手面板「设置」里填写）`);
       if (await getTask()) throw new Error('已有进行中的任务，一次只处理一个人');
+      const email = msg.email.trim().toLowerCase();
+      const name = msg.name.trim();
+      if (!name) throw new Error('请填写姓名');
+      if (!isAllowed(email, settings.allowedDomains)) throw new Error(`只能使用公司邮箱（${settings.allowedDomains.join('、')}）`);
       const roster = await getRoster();
-      const c = roster.find((x) => x.email === msg.email);
-      if (!c) throw new Error('名单中没有该邮箱');
-      if (!isAllowed(c.email, settings.allowedDomains)) throw new Error('非公司域名');
-      if (c.status !== 'pending') throw new Error('只有「待开始」的同事可以开始');
-      await updateColleague(c.email, { status: 'filling', keyName: renderKeyName(settings.keyNameTemplate, c), note: '' });
-      const tab = await browser.tabs.create({ url: LOGIN_URL, active: true });
-      await setTask({ email: c.email, tabId: tab.id, startedAt: new Date().toISOString() });
-      return state();
+      const existing = roster.find((c) => c.email === email);
+      if (existing && existing.status !== 'pending') {
+        throw new Error('该邮箱已经处理过（一人一号），如需重来请在面板里重置');
+      }
+      if (!existing) {
+        const { added, rejected } = parseRoster(`${name},${email}`, settings.allowedDomains, roster);
+        if (!added.length) throw new Error(rejected[0]?.reason ?? '无法添加');
+        await setRoster([...roster, ...added]);
+      }
+      await beginTask(email, sender.tab?.id);
+      return { ok: true };
+    }
+
+    case 'cs:status': {
+      const [settings, task] = await Promise.all([getSettings(), getTask()]);
+      return { busy: !!task, domains: settings.allowedDomains, ready: !settingsReady(settings) };
     }
 
     case 'stopTask': {
@@ -285,7 +337,29 @@ async function handle(msg: Msg, sender: { tab?: { id?: number; url?: string } })
 }
 
 export default defineBackground(() => {
+  // Chrome / Edge：点工具栏图标直接打开侧栏
   (globalThis as any).chrome?.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: true })?.catch?.(() => {});
+  // Firefox：点图标切换侧栏（Chrome 设置了上面的行为后不会触发 onClicked）
+  browser.action?.onClicked?.addListener((tab) => {
+    const sb = (browser as any).sidebarAction;
+    if (sb?.toggle) void sb.toggle();
+    else void openPanel(tab.id, tab.windowId);
+  });
+
+  // 右键菜单：工具栏图标 / apmix.ai 页面
+  const menus = (browser as any).contextMenus ?? (browser as any).menus;
+  browser.runtime.onInstalled.addListener(() => {
+    menus?.removeAll?.(() => {
+      menus.create({ id: 'apmix-open', title: '打开 APMIX 协助注册', contexts: ['action'] });
+      menus.create({
+        id: 'apmix-open-page', title: '打开 APMIX 协助注册', contexts: ['page'],
+        documentUrlPatterns: ['https://apmix.ai/*', 'https://www.apmix.ai/*'],
+      });
+    });
+  });
+  menus?.onClicked?.addListener((_info: unknown, tab?: { id?: number; windowId?: number }) => {
+    void openPanel(tab?.id, tab?.windowId);
+  });
 
   browser.runtime.onMessage.addListener((raw: unknown, sender, sendResponse) => {
     const msg = raw as Msg;
@@ -293,6 +367,14 @@ export default defineBackground(() => {
     // 只接受本扩展页面与 apmix.ai 内容脚本的消息
     if (sender.id !== browser.runtime.id) { sendResponse({ ok: false, error: '拒绝' }); return true; }
     if (msg.type.startsWith('cs:') && !(sender.tab?.url && isApmixUrl(sender.tab.url))) { sendResponse({ ok: false, error: '拒绝' }); return true; }
+    if (msg.type === 'cs:openPanel') {
+      // 同步调用，保留页面点击的用户手势
+      openPanel(sender.tab?.id, sender.tab?.windowId).then(
+        () => sendResponse({ ok: true, data: null }),
+        (e: Error) => sendResponse({ ok: false, error: e.message }),
+      );
+      return true;
+    }
     handle(msg, sender)
       .then((data) => sendResponse({ ok: true, data } satisfies Reply))
       .catch((e: Error) => sendResponse({ ok: false, error: e.message } satisfies Reply));
