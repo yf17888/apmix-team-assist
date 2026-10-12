@@ -21,6 +21,14 @@
 - Keys 页预填 Key 名、捕获新建的 `apx_live_` Key
 - 导出 Claude Code / Codex CLI / Cursor / curl 配置，`/v1/models` 连通性检测
 
+## 使用
+
+1. 设置页填写公司邮箱域名、Key 命名规则，选择模式（同事自助 / 管理员代办）
+2. 设置本地加密口令
+3. 导入名单 CSV（`姓名,邮箱,部门`），对某位同事点「开始」
+4. 按侧栏提示：完成人机验证 → 打开登录链接 → 点 Create key
+5. Key 自动加密保存，复制配置或导出交付文件，标记已交付后删除本地 Key
+
 ## 开发
 
 需要 Node.js 22+。
@@ -28,9 +36,11 @@
 ```bash
 npm install
 npm run dev            # Chrome 开发模式
-npm run build:all      # 构建 Chrome / Edge / Firefox
+npm run build:all      # 构建 Chrome / Edge / Firefox（均为 MV3）
 npm test
 ```
+
+每次推送到 main，GitHub Actions 会自动测试并产出三个浏览器的 zip（Actions → build → Artifacts）。
 
 加载：Chrome / Edge 扩展管理页开启开发者模式 → 加载已解压的扩展程序 → `.output/chrome-mv3`。
 
