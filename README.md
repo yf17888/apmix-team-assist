@@ -40,7 +40,7 @@ npm run build:all      # 构建 Chrome / Edge / Firefox（均为 MV3）
 npm test
 ```
 
-每次推送到 main，GitHub Actions 会自动测试并产出三个浏览器的 zip（Actions → build → Artifacts）。
+每次推送到 main，GitHub Actions 会自动测试并打包三个浏览器的 zip，发布到仓库 **Releases → latest**（也可在 Actions 运行页底部 Artifacts 下载）。
 
 加载：Chrome / Edge 扩展管理页开启开发者模式 → 加载已解压的扩展程序 → `.output/chrome-mv3`。
 
