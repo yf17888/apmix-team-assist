@@ -28,4 +28,5 @@ jobs:
           name: apmix-team-assist
           path: .output/*.zip
           if-no-files-found: error
-# ci
+          # .output 是隐藏目录，upload-artifact 默认会跳过
+          include-hidden-files: true
