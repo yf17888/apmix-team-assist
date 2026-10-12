@@ -1,0 +1,38 @@
+name: release-latest
+on:
+  workflow_run:
+    workflows: [build]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: release-latest
+  cancel-in-progress: true
+
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run zip:all
+      # 发布到 Releases 页的 "latest" 预发布版本，方便直接下载
+      - name: Publish latest pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest .output/*.zip \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "最新构建 (${GITHUB_SHA::7})" \
+            --notes "main 分支自动构建：Chrome / Edge / Firefox (MV3)。解压后在扩展管理页加载。"
